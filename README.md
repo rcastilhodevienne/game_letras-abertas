@@ -20,8 +20,4 @@ Jogos educativos tradicionais costumam ser monótonos (clicar em respostas em um
 * **No Computador:** Setas do teclado ou WASD para andar, e mouse para clicar no skate/opções.
 * **No Celular:** Toque em qualquer lugar da tela e o personagem andará até aquele ponto (Tap-to-move estilo mobile RPG).
 
-## 🚀 Como hospedar grátis no GitHub Pages
-1. Suba o arquivo `index.html` para um novo repositório no seu GitHub.
-2. Vá em `Settings` > `Pages`.
-3. Selecione a branch `main` ou `master` e clique em Save.
-4. O link será gerado e estará pronto para ser compartilhado com pais, alunos e jogadores!
+
