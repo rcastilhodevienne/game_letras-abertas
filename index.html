@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aventura das Letras: Mundo Aberto</title>
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background-color: #2c3e50; overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #game-container {
+            width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;
+        }
+        /* UI em HTML para o Menu Inicial */
+        #login-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(44, 62, 80, 0.95); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 1000; color: white;
+        }
+        input {
+            padding: 15px; font-size: 20px; border-radius: 8px; border: none; margin: 10px; text-align: center; width: 80%; max-width: 300px;
+        }
+        button {
+            padding: 15px 30px; font-size: 18px; border-radius: 8px; border: none;
+            background: #27ae60; color: white; cursor: pointer; font-weight: bold; margin: 10px; width: 80%; max-width: 300px;
+        }
+        button:hover { background: #2ecc71; }
+        .btn-selva { background: #d35400; }
+        .btn-selva:hover { background: #e67e22; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+</head>
+<body>
+    <!-- Menu Inicial HTML (Mais acessível para crianças digitarem) -->
+    <div id="login-screen">
+        <h1 style="text-align: center;">Aventura Aberta</h1>
+        <p>Qual é o seu nome, explorador?</p>
+        <input type="text" id="playerName" placeholder="Digite seu nome..." autocomplete="off">
+        <p>Onde você quer explorar?</p>
+        <button onclick="startGame('cidade')">Ir para a CIDADE 🏙️</button>
+        <button class="btn-selva" onclick="startGame('selva')">Ir para a SELVA 🌴</button>
+    </div>
+
+    <div id="game-container"></div>
+
+    <script>
+        // Variáveis Globais de Estado
+        let globalPlayerName = "Herói";
+        let globalTheme = "cidade";
+        let globalCoins = 0;
+        let globalHasSkate = true; // Já começa com skate para testar
+
+        function startGame(theme) {
+            let nameInput = document.getElementById('playerName').value;
+            if(nameInput.trim() !== "") globalPlayerName = nameInput;
+            globalTheme = theme;
+            document.getElementById('login-screen').style.display = 'none';
+            game.scene.start('WorldScene');
+        }
+
+        // --- CENA DO MUNDO ABERTO ---
+        class WorldScene extends Phaser.Scene {
+            constructor() { super('WorldScene'); }
+
+            preload() {
+                // Gerando gráficos procedurais (Substitua por Pixel Art PNGs depois)
+                let g = this.add.graphics();
+                
+                // Jogador
+                g.fillStyle(0x3498db, 1); g.fillCircle(16, 16, 16);
+                g.fillStyle(0xffeaaa, 1); g.fillCircle(16, 16, 10); // rosto
+                g.generateTexture('player', 32, 32); g.clear();
+
+                // Chão (Muda cor baseado no tema)
+                g.fillStyle(globalTheme === 'cidade' ? 0x95a5a6 : 0x27ae60, 1);
+                g.fillRect(0, 0, 64, 64); g.generateTexture('ground', 64, 64); g.clear();
+
+                // Parede/Árvore
+                g.fillStyle(globalTheme === 'cidade' ? 0x34495e : 0x2c3e50, 1);
+                g.fillRect(0, 0, 64, 64); g.generateTexture('wall', 64, 64); g.clear();
+
+                // Porta/Estabelecimento
+                g.fillStyle(0xf1c40f, 1); g.fillRect(0, 0, 64, 64); 
+                g.fillStyle(0x000000, 1); g.fillRect(20, 20, 24, 44); // detalhe porta
+                g.generateTexture('door', 64, 64); g.clear();
+
+                // NPC
+                g.fillStyle(0xe74c3c, 1); g.fillCircle(16, 16, 16);
+                g.fillStyle(0xffffff, 1); g.fillText("?", 12, 8);
+                g.generateTexture('npc', 32, 32); g.clear();
+            }
+
+            create() {
+                // Criar Mapa (Mundo Aberto 10x10 blocos de 64px)
+                // 0 = Chão, 1 = Parede, 2 = Porta, 3 = NPC
+                const mapData = [
+                    [1,1,1,1,1,1,1,1,1,1],
+                    [1,0,0,0,0,0,2,1,0,1],
+                    [1,0,3,0,0,0,0,1,0,1],
+                    [1,0,0,0,1,1,0,0,0,1],
+                    [1,1,0,0,1,1,0,3,0,1],
+                    [1,0,0,0,0,0,0,0,0,1],
+                    [1,0,3,0,0,2,1,0,0,1],
+                    [1,0,0,0,0,0,1,0,0,1],
+                    [1,1,1,1,1,1,1,1,1,1]
+                ];
+
+                const tileSize = 64;
+                this.walls = this.physics.add.staticGroup();
+                this.doors = this.physics.add.staticGroup();
+                this.npcs = this.physics.add.staticGroup();
+
+                for (let y = 0; y < mapData.length; y++) {
+                    for (let x = 0; x < mapData[y].length; x++) {
+                        let px = x * tileSize + (tileSize/2);
+                        let py = y * tileSize + (tileSize/2);
+                        
+                        this.add.image(px, py, 'ground'); // Fundo
+                        
+                        let tile = mapData[y][x];
+                        if (tile === 1) this.walls.create(px, py, 'wall');
+                        if (tile === 2) {
+                            let door = this.doors.create(px, py, 'door');
+                            door.targetRoom = "Loja de Livros";
+                        }
+                        if (tile === 3) {
+                            let npc = this.npcs.create(px, py, 'npc');
+                            npc.question = this.getRandomQuestion();
+                        }
+                    }
+                }
+
+                // Jogador
+                this.player = this.physics.add.sprite(100, 100, 'player');
+                this.player.setCollideWorldBounds(true);
+                this.physics.world.setBounds(0, 0, mapData[0].length * tileSize, mapData.length * tileSize);
+                this.cameras.main.setBounds(0, 0, mapData[0].length * tileSize, mapData.length * tileSize);
+                this.cameras.main.startFollow(this.player);
+
+                // Colisões
+                this.physics.add.collider(this.player, this.walls);
+                
+                // Interações
+                this.physics.add.overlap(this.player, this.doors, this.enterDoor, null, this);
+                this.physics.add.overlap(this.player, this.npcs, this.talkToNPC, null, this);
+
+                // Controles (PC e Mobile/Toque)
+                this.cursors = this.input.keyboard.createCursorKeys();
+                this.target = new Phaser.Math.Vector2();
+                this.isMovingToTarget = false;
+
+                this.input.on('pointerdown', (pointer) => {
+                    this.target.x = pointer.worldX;
+                    this.target.y = pointer.worldY;
+                    this.isMovingToTarget = true;
+                });
+
+                // UI do Jogo
+                this.createUI();
+            }
+
+            createUI() {
+                // Barra Superior
+                let uiBox = this.add.rectangle(0, 0, this.cameras.main.width*2, 80, 0x000000, 0.7).setOrigin(0,0).setScrollFactor(0);
+                this.nameText = this.add.text(20, 20, `${globalPlayerName} | Moedas: ${globalCoins}`, { fontSize: '20px', fill: '#fff', fontWeight: 'bold' }).setScrollFactor(0);
+                
+                // Botão de Skate (Veículo)
+                this.skateActive = false;
+                this.skateBtn = this.add.text(this.cameras.main.width - 150, 20, '🛹 ANDAR', { 
+                    fontSize: '20px', backgroundColor: '#e67e22', padding: {x: 10, y: 5}, borderRadius: '5px' 
+                }).setScrollFactor(0).setInteractive();
+
+                this.skateBtn.on('pointerdown', () => {
+                    this.skateActive = !this.skateActive;
+                    this.skateBtn.setText(this.skateActive ? '🛹 SKATE!' : '🛹 ANDAR');
+                    this.skateBtn.setBackgroundColor(this.skateActive ? '#27ae60' : '#e67e22');
+                });
+
+                // Tela de Diálogo (Oculta)
+                this.dialogContainer = this.add.container(this.cameras.main.width/2, this.cameras.main.height/2).setScrollFactor(0);
+                this.dialogContainer.setDepth(100);
+                this.dialogContainer.setVisible(false);
+                
+                let box = this.add.rectangle(0, 0, 320, 250, 0x000000, 0.9).setStrokeStyle(4, 0xffffff);
+                this.dialogText = this.add.text(0, -80, "Texto", { fontSize: '18px', fill: '#fff', align: 'center', wordWrap: {width: 280} }).setOrigin(0.5);
+                this.btnA = this.createDialogButton(-80, 40, "A", () => this.checkAnswer(0));
+                this.btnB = this.createDialogButton(80, 40, "B", () => this.checkAnswer(1));
+                this.btnC = this.createDialogButton(0, 100, "C", () => this.checkAnswer(2));
+                
+                this.dialogContainer.add([box, this.dialogText, this.btnA.bg, this.btnA.txt, this.btnB.bg, this.btnB.txt, this.btnC.bg, this.btnC.txt]);
+            }
+
+            createDialogButton(x, y, text, callback) {
+                let bg = this.add.rectangle(x, y, 140, 40, 0x2980b9).setInteractive();
+                let txt = this.add.text(x, y, text, { fontSize: '16px', fill: '#fff' }).setOrigin(0.5);
+                bg.on('pointerdown', callback);
+                return {bg, txt, setText: (t) => txt.setText(t)};
+            }
+
+            update() {
+                if (this.dialogContainer.visible) {
+                    this.player.setVelocity(0);
+                    return; // Pausa movimento durante diálogo
+                }
+
+                let speed = this.skateActive ? 300 : 150; // Skate dobra a velocidade
+                this.player.setVelocity(0);
+
+                // Movimento Teclado
+                if (this.cursors.left.isDown) this.player.setVelocityX(-speed);
+                else if (this.cursors.right.isDown) this.player.setVelocityX(speed);
+                if (this.cursors.up.isDown) this.player.setVelocityY(-speed);
+                else if (this.cursors.down.isDown) this.player.setVelocityY(speed);
+
+                // Movimento Mobile (Toque)
+                if (this.isMovingToTarget) {
+                    let distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.target.x, this.target.y);
+                    if (distance < 10) {
+                        this.isMovingToTarget = false;
+                        this.player.setVelocity(0);
+                    } else {
+                        this.physics.moveToObject(this.player, this.target, speed);
+                    }
+                }
+            }
+
+            enterDoor(player, door) {
+                // Impede reentrada múltipla rápida
+                this.player.y += 20; 
+                this.isMovingToTarget = false;
+                
+                // Feedback visual antes de mudar
+                this.cameras.main.fade(500, 0, 0, 0);
+                this.cameras.main.once('camerafadeoutcomplete', () => {
+                    // Aqui iria para a cena do Interior. Para o MVP, mostramos um desafio especial.
+                    alert(`Você entrou em: ${door.targetRoom}!\nDesafio Interno Completo +50 Moedas!`);
+                    globalCoins += 50;
+                    this.nameText.setText(`${globalPlayerName} | Moedas: ${globalCoins}`);
+                    this.cameras.main.fadeIn(500, 0, 0, 0);
+                });
+            }
+
+            talkToNPC(player, npc) {
+                // Afasta o jogador para não travar no colisor
+                this.player.y += 20;
+                this.isMovingToTarget = false;
+                this.currentNPC = npc;
+
+                if(npc.answered) {
+                    this.showDialog("Eu já falei com você! Continue explorando.", ["Tchau", "Ok", "Fui!"]);
+                    return;
+                }
+
+                this.currentQuestion = npc.question;
+                this.showDialog(this.currentQuestion.q, this.currentQuestion.options);
+            }
+
+            showDialog(text, options) {
+                this.dialogText.setText(text);
+                this.btnA.setText(options[0]);
+                this.btnB.setText(options[1]);
+                this.btnC.setText(options[2] || "-");
+                this.btnC.bg.setVisible(!!options[2]);
+                this.btnC.txt.setVisible(!!options[2]);
+                this.dialogContainer.setVisible(true);
+            }
+
+            checkAnswer(index) {
+                if(!this.currentQuestion) {
+                    this.dialogContainer.setVisible(false);
+                    return;
+                }
+
+                if(index === this.currentQuestion.correct) {
+                    globalCoins += 10;
+                    this.nameText.setText(`${globalPlayerName} | Moedas: ${globalCoins}`);
+                    this.currentNPC.answered = true;
+                    this.showDialog("Correto! Você ganhou 10 moedas!", ["Fantástico!", "Eba!", "Mais desafios!"]);
+                    this.currentQuestion = null; // Próximo clique fecha
+                } else {
+                    this.showDialog("Ops, leia com calma e tente de novo!", ["Tentar novamente", "Ler com atenção", "Entendi"]);
+                    this.currentQuestion = null;
+                }
+            }
+
+            getRandomQuestion() {
+                const q = [
+                    { q: "O padeiro tinha 5 pães. Vendeu 2 e assou mais 3. Quantos ele tem?", options: ["6", "5", "8"], correct: 0 },
+                    { q: "A placa diz 'PARE'. Qual a última letra dessa palavra?", options: ["P", "A", "E"], correct: 2 },
+                    { q: "Qual dessas palavras não é uma fruta?", options: ["Maçã", "Cadeira", "Banana"], correct: 1 },
+                    { q: "'O cachorro correu no parque.' Quem correu?", options: ["O parque", "O gato", "O cachorro"], correct: 2 },
+                    { q: "Se amanhã for terça-feira, que dia foi ontem?", options: ["Domingo", "Segunda", "Quarta"], correct: 0 }
+                ];
+                return q[Math.floor(Math.random() * q.length)];
+            }
+        }
+
+        // Iniciar Engine
+        const config = {
+            type: Phaser.AUTO,
+            parent: 'game-container',
+            width: window.innerWidth,
+            height: window.innerHeight,
+            scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
+            physics: { default: 'arcade', arcade: { debug: false } },
+            scene: [WorldScene]
+        };
+        const game = new Phaser.Game(config);
+    </script>
+</body>
+</html>
